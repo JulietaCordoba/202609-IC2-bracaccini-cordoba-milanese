@@ -1,0 +1,13 @@
+# Python / Django
+venv/
+__pycache__/
+*.pyc
+db.sqlite3
+.env
+
+# Node (por si acaso)
+node_modules/
+
+# Sistema
+.DS_Store
+Thumbs.db
