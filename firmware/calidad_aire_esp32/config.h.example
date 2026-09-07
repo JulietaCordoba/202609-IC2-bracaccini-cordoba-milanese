@@ -1,0 +1,12 @@
+// config.h.example — plantilla de configuración del firmware.
+// Copiar este archivo como "config.h" (en la misma carpeta) y completar
+// los valores reales antes de compilar. "config.h" no se sube al repo.
+
+#ifndef CONFIG_H
+#define CONFIG_H
+
+const char* WIFI_SSID = "NOMBRE_DE_TU_RED_WIFI";
+const char* WIFI_PASS = "CONTRASEÑA_DE_TU_RED_WIFI";
+const char* MQTT_HOST = "IP_DE_LA_RASPBERRY";  // ej: 192.168.1.62
+
+#endif
