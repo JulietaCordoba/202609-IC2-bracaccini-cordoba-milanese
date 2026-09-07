@@ -59,7 +59,7 @@ def api_devices(request):
 # apagada o el módulo de ventilación todavía no fue desplegado), cae a un
 # estado simulado en memoria para que el botón siga siendo funcional
 # durante la presentación.
-_simulated_fan_state = {"fan_on": False, "updated_at": None, "simulated": True}
+_simulated_fan_state = {"fan_on": False, "updated_at": None, "manual_mode": True, "simulated": True}
 
 
 def _proxy_post(path, json_body=None):
@@ -98,6 +98,22 @@ def api_fan_toggle(request):
         pass
 
     _simulated_fan_state["fan_on"] = not _simulated_fan_state["fan_on"]
+    _simulated_fan_state["updated_at"] = time.time()
+    _simulated_fan_state["simulated"] = True
+    return JsonResponse(_simulated_fan_state)
+
+
+@csrf_exempt
+@require_POST
+def api_fan_auto(request):
+    """Devuelve el control del ventilador al modo automático del ESP32."""
+    try:
+        return _proxy_post("/api/fan/auto")
+    except requests.RequestException:
+        pass
+
+    _simulated_fan_state["fan_on"] = None
+    _simulated_fan_state["manual_mode"] = False
     _simulated_fan_state["updated_at"] = time.time()
     _simulated_fan_state["simulated"] = True
     return JsonResponse(_simulated_fan_state)

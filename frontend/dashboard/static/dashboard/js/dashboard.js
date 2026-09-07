@@ -119,18 +119,41 @@ async function toggleFan() {
   }
 }
 
+async function setFanAuto() {
+  const btn = document.getElementById('fanAutoBtn');
+  btn.disabled = true;
+  try {
+    const r = await fetch(`${API_BASE}/fan/auto`, { method: 'POST' });
+    const d = await r.json();
+    updateFanPanel(d);
+  } catch(e) {
+    console.warn('[fan/auto] error', e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function updateFanPanel(d) {
   const el = document.getElementById('fanState');
-  const on = !!d.fan_on;
-  el.innerHTML = on
-    ? '<span class="unit">ENCENDIDO</span>'
-    : '<span class="unit">APAGADO</span>';
-  el.className = 'value-display ' + (on ? 'normal' : '');
+  const manual = d.manual_mode;
+
+  if (d.fan_on === null || d.fan_on === undefined) {
+    el.innerHTML = '<span class="unit">AUTOMÁTICO</span>';
+    el.className = 'value-display';
+  } else {
+    const on = !!d.fan_on;
+    el.innerHTML = on
+      ? '<span class="unit">ENCENDIDO</span>'
+      : '<span class="unit">APAGADO</span>';
+    el.className = 'value-display ' + (on ? 'normal' : '');
+  }
 
   const note = document.getElementById('fanSimulatedNote');
-  note.textContent = d.simulated
-    ? 'Modo simulado (sin conexión con el relé físico)'
-    : '\u00A0';
+  const parts = [];
+  if (manual === true) parts.push('Modo manual');
+  else if (manual === false) parts.push('Modo automático');
+  if (d.simulated) parts.push('simulado (sin conexión con el relé físico)');
+  note.textContent = parts.length ? parts.join(' — ') : '\u00A0';
 }
 
 // === UI helpers ===

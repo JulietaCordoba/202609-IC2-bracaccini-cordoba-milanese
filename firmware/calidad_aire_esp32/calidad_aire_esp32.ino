@@ -17,7 +17,7 @@ const int RELAY_PIN = 23;   // pin del relay del ventilador
 const int MQTT_PORT = 1883;
 
 const char* TOPIC_MQ135     = "aq/aula-1/mq135";        // datos del sensor
-const char* TOPIC_VENT_SET  = "aq/aula-1/vent/set";     // recibe ON/OFF
+const char* TOPIC_VENT_SET  = "aq/aula-1/vent/set";     // recibe ON/OFF/AUTO
 const char* TOPIC_VENT_EST  = "aq/aula-1/vent/estado";  // publica ON/OFF
 
 WiFiClient espClient;
@@ -25,6 +25,12 @@ PubSubClient mqtt(espClient);
 
 unsigned long lastSend = 0;
 const unsigned long SEND_INTERVAL = 4000; // 4 segundos
+
+// --- Modo de control del ventilador ---
+// Mientras manualMode == true, el bloque automático del loop() no toca el
+// relé: solo lo hace el usuario desde la web (comandos ON/OFF). El sistema
+// vuelve a decidir solo cuando llega el comando "AUTO".
+bool manualMode = false;
 
 // ======================================================
 //  WIFI
@@ -46,20 +52,27 @@ void connectWiFi() {
 // ======================================================
 void callback(char* topic, byte* payload, unsigned int length) {
   String msg;
-  for (int i = 0; i < length; i++) msg += (char)payload[i];
+  for (unsigned int i = 0; i < length; i++) msg += (char)payload[i];
 
-  // --- Control manual del ventilador ---
-  if (String(topic) == TOPIC_VENT_SET) {
-    if (msg == "ON") {
-      digitalWrite(RELAY_PIN, LOW);     // relay activo
-      mqtt.publish(TOPIC_VENT_EST, "ON");
-      Serial.println("[ESP32] Ventilador -> ON (manual)");
-    } 
-    else if (msg == "OFF") {
-      digitalWrite(RELAY_PIN, HIGH);    // relay apagado
-      mqtt.publish(TOPIC_VENT_EST, "OFF");
-      Serial.println("[ESP32] Ventilador -> OFF (manual)");
-    }
+  if (String(topic) != TOPIC_VENT_SET) return;
+
+  if (msg == "ON") {
+    manualMode = true;
+    digitalWrite(RELAY_PIN, LOW);     // relay activo
+    mqtt.publish(TOPIC_VENT_EST, "ON");
+    Serial.println("[ESP32] Ventilador -> ON (manual)");
+  }
+  else if (msg == "OFF") {
+    manualMode = true;
+    digitalWrite(RELAY_PIN, HIGH);    // relay apagado
+    mqtt.publish(TOPIC_VENT_EST, "OFF");
+    Serial.println("[ESP32] Ventilador -> OFF (manual)");
+  }
+  else if (msg == "AUTO") {
+    manualMode = false;
+    Serial.println("[ESP32] Ventilador -> modo AUTOMATICO reactivado");
+    // No tocamos el relé acá: el próximo ciclo del loop() lo va a
+    // ajustar según la lectura actual del sensor.
   }
 }
 
@@ -121,42 +134,40 @@ void loop() {
     int val = analogRead(MQ135_A0);  // lectura cruda
     const char* estado;
 
-    // --- CONTROL DE LEDs Y VENTILADOR AUTOMÁTICO ---
+    // --- Clasificación del aire (esto SIEMPRE se calcula y se muestra
+    // en los LEDs, independientemente del modo del ventilador) ---
     if (val <= 700) {
-      // Verde → aire limpio
       digitalWrite(LED_VERDE, HIGH);
       digitalWrite(LED_AMARILLO, LOW);
       digitalWrite(LED_ROJO, LOW);
-
       estado = "ambiente limpio";
-
-      // Ventilador OFF automático
-      digitalWrite(RELAY_PIN, HIGH);
-      mqtt.publish(TOPIC_VENT_EST, "OFF");
-    } 
+    }
     else if (val > 700 && val <= 1500) {
-      // Amarillo → regular
       digitalWrite(LED_VERDE, LOW);
       digitalWrite(LED_AMARILLO, HIGH);
       digitalWrite(LED_ROJO, LOW);
-
       estado = "ambiente regular";
-
-      // Ventilador ON (automático)
-      digitalWrite(RELAY_PIN, LOW);
-      mqtt.publish(TOPIC_VENT_EST, "ON");
-    } 
+    }
     else {
-      // Rojo → peligroso
       digitalWrite(LED_VERDE, LOW);
       digitalWrite(LED_AMARILLO, LOW);
       digitalWrite(LED_ROJO, HIGH);
-
       estado = "ambiente peligroso";
+    }
 
-      // Ventilador ON sí o sí
-      digitalWrite(RELAY_PIN, LOW);
-      mqtt.publish(TOPIC_VENT_EST, "ON");
+    // --- CONTROL AUTOMÁTICO DEL VENTILADOR ---
+    // Solo actúa si NO estamos en modo manual. Si el usuario apagó el
+    // ventilador a mano, esto no lo va a volver a prender solo hasta
+    // que llegue el comando "AUTO".
+    if (!manualMode) {
+      if (val <= 700) {
+        digitalWrite(RELAY_PIN, HIGH);
+        mqtt.publish(TOPIC_VENT_EST, "OFF");
+      } else {
+        // "ambiente regular" o "ambiente peligroso": ventilador ON
+        digitalWrite(RELAY_PIN, LOW);
+        mqtt.publish(TOPIC_VENT_EST, "ON");
+      }
     }
 
     // --- Publicar datos del sensor ---
