@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Calidad de Aire - MQ135</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:20px}
+    .row{display:flex;gap:20px;flex-wrap:wrap}
+    .card{border:1px solid #ddd;border-radius:12px;padding:16px;flex:1 1 420px;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+    h1{margin:.2rem 0 1rem}
+    .kpi{font-size:42px;font-weight:700}
+    .muted{color:#777}
+    .badge{display:inline-block;padding:4px 10px;border-radius:999px;font-weight:600}
+    .ok{background:#e8f7ec;color:#137a2a;border:1px solid #bfe7c8}
+    .warn{background:#fff7e5;color:#8a6d1d;border:1px solid #f1e0b9}
+    .bad{background:#fde8e7;color:#8a1d1d;border:1px solid #f2c0bd}
+  </style>
+
+
+</head>
+
+<body>
+
+  <h1>Calidad de Aire (MQ135)</h1>
+
+  <div class="row">
+    <div class="card">
+      <div class="muted">Ultimo valor</div>
+      <div class="kpi" id="kpi">-</div>
+      <div class="muted" id="ts">-</div>
+      <div id="status" class="badge" >-</div>
+    </div>
+    <div class="card">
+      <canvas id="chart" height="140"></canvas>
+    </div>
+  </div>
+
+
+<script>
+   const API_BASE = location.origin + '/api';
+   async function fetchLatest() {
+     try {
+       const r = await fetch(`${API_BASE}/latest`);
+       if (!r.ok) throw new Error(`HTTP ${r.status}`);
+       const data = await r.json();              // -> {ts, gas}
+       if (data && data.ts != null && data.gas != null) {
+         const gas = Number(data.gas);
+         updateCurrentValue(gas);
+         const iso = new Date(Number(data.ts)/1e6).toISOString(); // ns -> ms
+         updateTimestamp(iso);
+         checkAlerts(gas);
+       } else {
+         updateCurrentValue(NaN);
+       }
+     } catch (e) {
+       console.warn('fetchLatest error:', e.message);
+       updateCurrentValue(NaN);
+     }
+   }
+
+
+  async function fetchHistory() {
+    try {
+      const r = await fetch(`${API_BASE}/query?limit=50`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const arr = await r.json();               // -> [{ts, gas}, ...]
+      updateMainChart(arr);
+    } catch (e) {
+      console.warn('fetchHistory error:', e.message);
+    }
+  }
+
+</script>
+
+</body>
+</html>
+ 
+
+
