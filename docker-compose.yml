@@ -1,0 +1,27 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.18
+    container_name: calidadaire-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+
+  influxdb:
+    image: influxdb:1.11
+    container_name: calidadaire-influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      - INFLUXDB_DB=calidadaire
+    volumes:
+      - influxdb-data:/var/lib/influxdb
+
+volumes:
+  mosquitto-data:
+  mosquitto-log:
+  influxdb-data:
