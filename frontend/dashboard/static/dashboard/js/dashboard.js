@@ -3,12 +3,10 @@ const API_BASE = 'http://192.168.1.62:8000/api';
 const REFRESH_INTERVAL = 4000; // 4s
 const WARNING_THRESHOLD = 700;    // ajustá si querés
 const DANGER_THRESHOLD  = 1500;   // ajustá si querés
+const DISPLAY_TZ = 'America/Argentina/Buenos_Aires';
 
-javascript
-let autoRefresh = true;
 let refreshTimer = null;
 let mainChart = null;
-let hourlyChart = null;
 let lastKnownStatus = null;
 let lastKnownFan = { fan_on: null, manual_mode: null };
 
@@ -24,13 +22,6 @@ function initCharts() {
     type:'line',
     data:{ labels:[], datasets:[{ label:'Calidad del Aire (ADC)', data:[], borderColor:chartColors.primary, backgroundColor:'rgba(76,175,80,.1)', borderWidth:2, tension:.3, fill:true, pointRadius:0 }] },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true}, x:{grid:{display:false}} } }
-  });
-
-  const ctx2 = document.getElementById('hourlyChart').getContext('2d');
-  hourlyChart = new Chart(ctx2, {
-    type:'bar',
-    data:{ labels:[], datasets:[{ label:'Promedio por Hora (ADC)', data:[], backgroundColor:'rgba(76,175,80,.6)', borderColor:chartColors.primary, borderWidth:1 }] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{grid:{display:false}} } }
   });
 }
 
@@ -62,14 +53,14 @@ async function fetchLatest() {
     if (d.gas != null) updateCurrentValue(d.gas);
     if (d.status) {
       const pretty = d.status.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
-      document.getElementById('currentStatus').textContent = 'Estado: ${pretty}';
+      document.getElementById('currentStatus').textContent = `Estado: ${pretty}`;
       lastKnownStatus = d.status;
       updateSafetyAlert();
     }
     if (d.ts) {
       const t = new Date(d.ts/1e6);
-      document.getElementById('currentTimestamp').textContent = t.toLocaleString('es-AR');
-      document.getElementById('lastUpdate').textContent     = t.toLocaleTimeString('es-AR');
+      document.getElementById('currentTimestamp').textContent = t.toLocaleString('es-AR', {timeZone: DISPLAY_TZ});
+      document.getElementById('lastUpdate').textContent     = t.toLocaleTimeString('es-AR', {timeZone: DISPLAY_TZ});
       // Actualizamos el panel del ESP32 usando el timestamp del último dato
       updateDevicePanelFromTs(d.ts);
     }
@@ -93,7 +84,6 @@ async function fetchStatistics() {
     const r = await fetch(`${API_BASE}/statistics`);
     const j = await r.json();
     if (j.statistics) updateStatistics(j.statistics);
-    if (j.hourly_average) updateHourlyChart(j.hourly_average);
   } catch(e) {
     console.warn('[stats] error', e);
   }
@@ -124,15 +114,19 @@ async function toggleFan() {
   }
 }
 
-async function setFanAuto() {
-  const btn = document.getElementById('fanAutoBtn');
+async function toggleFanMode() {
+  const btn = document.getElementById('fanModeBtn');
   btn.disabled = true;
   try {
-    const r = await fetch(`${API_BASE}/fan/auto`, { method: 'POST' });
+    // Si está en automático (o todavía no sabemos), pasamos a manual;
+    // si ya está en manual, volvemos a automático.
+    const goingManual = lastKnownFan.manual_mode !== true;
+    const endpoint = goingManual ? '/fan/manual' : '/fan/auto';
+    const r = await fetch(`${API_BASE}${endpoint}`, { method: 'POST' });
     const d = await r.json();
     updateFanPanel(d);
   } catch(e) {
-    console.warn('[fan/auto] error', e);
+    console.warn('[fan/mode] error', e);
   } finally {
     btn.disabled = false;
   }
@@ -159,6 +153,23 @@ function updateFanPanel(d) {
   else if (manual === false) parts.push('Modo automático');
   if (d.simulated) parts.push('simulado (sin conexión con el relé físico)');
   note.textContent = parts.length ? parts.join(' — ') : '\u00A0';
+
+  // Botón único de modo: muestra el modo actual y alterna al apretarlo.
+  const modeBtn = document.getElementById('fanModeBtn');
+  if (manual === true) {
+    modeBtn.textContent = 'Modo: Manual';
+    modeBtn.className = 'btn';
+  } else if (manual === false) {
+    modeBtn.textContent = 'Modo: Automático';
+    modeBtn.className = 'btn active';
+  } else {
+    modeBtn.textContent = 'Modo: --';
+    modeBtn.className = 'btn';
+  }
+
+  // El botón de encender/apagar solo se puede usar en modo manual.
+  // En automático queda bloqueado hasta que se cambie a manual explícitamente.
+  document.getElementById('fanToggleBtn').disabled = (manual !== true);
 
   lastKnownFan = { fan_on: d.fan_on, manual_mode: d.manual_mode };
   updateSafetyAlert();
@@ -192,7 +203,7 @@ function updateMainChart(data) {
   const values = [];
   data.forEach(it => {
     const d = new Date(it.ts/1e6);
-    labels.push(d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}));
+    labels.push(d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit', timeZone: DISPLAY_TZ}));
     values.push(it.gas);
   });
   mainChart.data.labels = labels;
@@ -200,28 +211,14 @@ function updateMainChart(data) {
   mainChart.update();
 }
 
-function updateHourlyChart(rows) {
-  hourlyChart.data.labels = rows.map(r => r.hour);
-  hourlyChart.data.datasets[0].data = rows.map(r => r.avg);
-  hourlyChart.update();
-}
-
 // === Refresh ===
 async function refreshData() {
   await Promise.all([ fetchLatest(), fetchStatistics(), fetchHistory(), fetchFanStatus() ]);
 }
 
-function toggleAutoRefresh() {
-  autoRefresh = !autoRefresh;
-  const btn = document.getElementById('autoRefreshBtn');
-  btn.textContent = autoRefresh ? 'Auto: ON' : 'Auto: OFF';
-  btn.className = autoRefresh ? 'btn active' : 'btn';
-  if (autoRefresh) startAuto(); else stopAuto();
-}
-
 function startAuto() {
   stopAuto();
-  refreshTimer = setInterval(() => { if (autoRefresh) refreshData(); }, REFRESH_INTERVAL);
+  refreshTimer = setInterval(() => { refreshData(); }, REFRESH_INTERVAL);
 }
 function stopAuto() { if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; } }
 

@@ -117,3 +117,19 @@ def api_fan_auto(request):
     _simulated_fan_state["updated_at"] = time.time()
     _simulated_fan_state["simulated"] = True
     return JsonResponse(_simulated_fan_state)
+
+
+@csrf_exempt
+@require_POST
+def api_fan_manual(request):
+    """Cambia a modo manual desde la interfaz web, sin tocar el estado
+    actual del ventilador (ni prende ni apaga)."""
+    try:
+        return _proxy_post("/api/fan/manual")
+    except requests.RequestException:
+        pass
+
+    _simulated_fan_state["manual_mode"] = True
+    _simulated_fan_state["updated_at"] = time.time()
+    _simulated_fan_state["simulated"] = True
+    return JsonResponse(_simulated_fan_state)

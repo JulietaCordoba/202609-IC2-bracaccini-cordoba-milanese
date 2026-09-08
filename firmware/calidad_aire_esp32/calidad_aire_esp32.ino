@@ -79,6 +79,11 @@ void callback(char* topic, byte* payload, unsigned int length) {
     Serial.println("[ESP32] Ventilador -> modo AUTOMATICO reactivado");
     publishVentStatus();
   }
+  else if (msg == "MANUAL") {
+    manualMode = true;
+    Serial.println("[ESP32] Modo MANUAL activado (sin cambiar el estado actual)");
+    publishVentStatus();
+  }
 }
 
 void connectMQTT() {
