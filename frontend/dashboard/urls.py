@@ -9,6 +9,7 @@ from .views import (
     api_fan_status,
     api_fan_toggle,
     api_fan_auto,
+    api_fan_manual,
 )
 
 urlpatterns = [
@@ -21,4 +22,5 @@ urlpatterns = [
     path('api/fan', api_fan_status),
     path('api/fan/toggle', api_fan_toggle),
     path('api/fan/auto', api_fan_auto),
+    path('api/fan/manual', api_fan_manual),
 ]

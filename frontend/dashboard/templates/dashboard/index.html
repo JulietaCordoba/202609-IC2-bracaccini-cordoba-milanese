@@ -40,9 +40,11 @@
     .alert-box.danger { background:#4d0000; border-left-color:#f44336; }
     .alert-box strong { color:#fff; text-transform:uppercase; font-size:12px; }
     .control-panel { display:flex; gap:10px; margin-top:15px; justify-content:center; }
-    .btn { padding:8px 20px; border:1px solid #404040; background:#1a1a1a; color:#e0e0e0; border-radius:4px; cursor:pointer; font-size:13px; text-transform:uppercase; letter-spacing:.5px; transition:all .2s; }
+    .btn { padding:8px 20px; border:1px solid #404040; background:#1a1a1a; color:#e0e0e0; border-radius:4px; cursor:pointer; font-size:13px; text-transform:uppercase; letter-spacing:.5px; transition:all .2s; white-space:nowrap; }
     .btn:hover { background:#404040; color:#fff; }
     .btn.active { background:#4CAF50; color:#000; border-color:#4CAF50; }
+    .btn:disabled { opacity:.4; cursor:not-allowed; }
+    .btn:disabled:hover { background:#1a1a1a; color:#e0e0e0; }
     @media (max-width:768px){ .value-display{ font-size:32px; } .dashboard-grid{ grid-template-columns:1fr; } }
   </style>
 </head>
@@ -62,10 +64,6 @@
         </div>
         <div class="timestamp" id="currentStatus">Estado: --</div>
         <div class="timestamp" id="currentTimestamp">Sin datos</div>
-        <div class="control-panel">
-          <button class="btn" onclick="refreshData()">Actualizar</button>
-          <button class="btn active" onclick="toggleAutoRefresh()" id="autoRefreshBtn">Auto: ON</button>
-        </div>
       </div>
 
       <!-- Estadísticas -->
@@ -75,7 +73,6 @@
           <div class="stat-item"><div class="stat-label">Promedio</div><div class="stat-value" id="avgValue">--</div></div>
           <div class="stat-item"><div class="stat-label">Máximo</div><div class="stat-value" id="maxValue">--</div></div>
           <div class="stat-item"><div class="stat-label">Mínimo</div><div class="stat-value" id="minValue">--</div></div>
-          
         </div>
       </div>
 
@@ -102,19 +99,22 @@
         </div>
       </div>
 
-      <!-- Control de ventilación (modo manual) -->
+      <!-- Control de ventilación -->
       <div class="card">
         <h2>Control de Ventilación</h2>
         <div class="value-display" id="fanState">
           <span class="unit">--</span>
         </div>
         <div class="timestamp" id="fanSimulatedNote">&nbsp;</div>
-        <div class="alert-box danger" id="fanSafetyAlert" style="display:none; margin-top:10px;"><strong>Atención</strong><br>
+        <div class="alert-box danger" id="fanSafetyAlert" style="display:none; margin-top:10px;">
+          <strong>Atención</strong><br>
           Aire peligroso detectado y el ventilador está apagado en modo manual. Considerá encenderlo.
         </div>
         <div class="control-panel">
+          <button class="btn active" onclick="toggleFanMode()" id="fanModeBtn">Modo: --</button>
+        </div>
+        <div class="control-panel">
           <button class="btn" onclick="toggleFan()" id="fanToggleBtn">Encender / Apagar</button>
-          <button class="btn" onclick="setFanAuto()" id="fanAutoBtn">Modo Automático</button>
         </div>
       </div>
     </div>
@@ -123,15 +123,9 @@
       <h2>Histórico de Mediciones</h2>
       <canvas id="mainChart"></canvas>
     </div>
-
-    <div class="chart-container">
-      <h2>Promedio por Hora (24h)</h2>
-      <canvas id="hourlyChart"></canvas>
-    </div>
   </div>
 
   <script src="{% static 'dashboard/js/dashboard.js' %}"></script>
 </body>
 
 </html>
-
