@@ -21,7 +21,7 @@ import time
 import paho.mqtt.client as mqtt
 
 # --- Debe coincidir exactamente con el .ino real ---
-MQTT_HOST = os.getenv("MQTT_HOST", "192.168.1.62")
+MQTT_HOST = os.getenv("MQTT_HOST", "127.0.0.1")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
 TOPIC_MQ135 = "aq/aula-1/mq135"

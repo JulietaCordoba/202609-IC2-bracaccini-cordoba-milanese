@@ -1,4 +1,3 @@
-README
 # Sistema de Monitoreo de Calidad del Aire Basado en IoT
 
 ## 1. Identificación
@@ -26,24 +25,25 @@ El sistema tiene como objetivo el monitoreo continuo de la calidad del aire en e
 
 ## 3. Arquitectura del Sistema
 
-El sistema se organiza en cuatro capas desacopladas:
+El sistema se organiza en cuatro capas desacopladas.
 
-| Capa | Componente | Ejecución / Entorno | Responsabilidad |
-|---|---|---|---|
-| 1. Adquisición | Firmware ESP32 / `simulator.py` | Microcontrolador ESP32 o host local | Lee el sensor MQ-135, evalúa umbrales, conmuta el ventilador y publica telemetría por MQTT. |
-| 2. Transporte | Broker MQTT (Eclipse Mosquitto) | Contenedor Docker | Broker de mensajería para distribución de telemetría y comandos de control. |
-| 3. Procesamiento y Persistencia | Backend Django (`airsrv`/`telemetry`) e InfluxDB | Servidor / Raspberry Pi + Contenedor Docker | Suscriptor MQTT, procesa e ingesta mediciones en InfluxDB v1 y expone API REST. |
-| 4. Presentación | Frontend Django (`airdash`/`dashboard`) | Navegador del cliente | Visualización de mediciones en tiempo real, histórico con gráficos y control manual/automático de ventilación. |
+La **capa de adquisición** está compuesta por el firmware del ESP32 (o, alternativamente, por `simulator.py` cuando no se dispone del hardware físico), y se ejecuta directamente sobre el microcontrolador o sobre un host local. Es responsable de leer el sensor MQ-135, evaluar los umbrales de calidad del aire, conmutar el ventilador y publicar la telemetría por MQTT.
+
+La **capa de transporte** está implementada mediante el broker MQTT Eclipse Mosquitto, desplegado en un contenedor Docker. Su responsabilidad es la de broker de mensajería, distribuyendo tanto la telemetría como los comandos de control entre los distintos componentes.
+
+La **capa de procesamiento y persistencia** está formada por el backend Django (`airsrv`/`telemetry`) junto con InfluxDB, y puede ejecutarse en cualquier servidor (en este proyecto, una Raspberry Pi, aunque también puede correr en la misma máquina que el resto de los componentes). Se encarga de actuar como suscriptor MQTT, procesar e ingestar las mediciones en InfluxDB v1, y exponer una API REST.
+
+La **capa de presentación** corresponde al frontend Django (`airdash`/`dashboard`), que se ejecuta en el navegador del cliente. Su responsabilidad es la visualización de las mediciones en tiempo real, la consulta del histórico mediante gráficos, y el control manual/automático del sistema de ventilación.
 
 ## 4. Contrato de Tópicos MQTT
 
 Todos los tópicos usan QoS 0 (sin garantía de entrega adicional; suficiente para telemetría periódica y comandos idempotentes).
 
-| Tópico | Publica | Se suscribe | Formato del payload | Descripción |
-|---|---|---|---|---|
-| `aq/aula-1/mq135` | ESP32 / `simulator.py` | Backend (`airsrv`) | JSON: `{"g": <int>, "estado": "<string>"}` | Telemetría del sensor. `g` es el valor analógico crudo (0-4095). `estado` es uno de: `"ambiente limpio"`, `"ambiente regular"`, `"ambiente peligroso"`. Se publica cada 4 segundos. |
-| `aq/aula-1/vent/set` | Backend (`airsrv`) | ESP32 / `simulator.py` | Texto plano: `"ON"` \| `"OFF"` \| `"AUTO"` \| `"MANUAL"` | Comando de control del ventilador enviado desde la web. `ON`/`OFF` fuerzan el estado y activan el modo manual. `AUTO` devuelve el control al umbral automático del sensor. `MANUAL` cambia a modo manual sin alterar el estado actual del relé. |
-| `aq/aula-1/vent/estado` | ESP32 / `simulator.py` | Backend (`airsrv`) | JSON: `{"fan_on": <bool>, "manual": <bool>}` | Confirmación del estado real del ventilador y del modo activo. Se publica en cada cambio de estado y una vez al arrancar, para que el backend/la web nunca queden con un dato desactualizado tras un reinicio. |
+El tópico `aq/aula-1/mq135` es publicado por el ESP32 (o por `simulator.py`) y consumido por el backend (`airsrv`). Su payload es un JSON con la estructura `{"g": <int>, "estado": "<string>"}`, donde `g` es el valor analógico crudo del sensor (0-4095) y `estado` es uno de los siguientes valores: `"ambiente limpio"`, `"ambiente regular"` o `"ambiente peligroso"`. Este mensaje se publica cada 4 segundos y corresponde a la telemetría del sensor.
+
+El tópico `aq/aula-1/vent/set` es publicado por el backend (`airsrv`) y consumido por el ESP32 (o por `simulator.py`). Su payload es texto plano, con alguno de los valores `"ON"`, `"OFF"`, `"AUTO"` o `"MANUAL"`, y representa el comando de control del ventilador enviado desde la web. Los comandos `ON`/`OFF` fuerzan el estado del relé y activan el modo manual; `AUTO` devuelve el control al umbral automático del sensor; `MANUAL` cambia a modo manual sin alterar el estado actual del relé.
+
+El tópico `aq/aula-1/vent/estado` es publicado por el ESP32 (o por `simulator.py`) y consumido por el backend (`airsrv`). Su payload es un JSON con la estructura `{"fan_on": <bool>, "manual": <bool>}`, que confirma el estado real del ventilador y el modo activo. Se publica en cada cambio de estado y una vez al arrancar, para que el backend y la web nunca queden con un dato desactualizado tras un reinicio.
 
 ### Lógica de control del ventilador
 
@@ -64,35 +64,38 @@ Todos los tópicos usan QoS 0 (sin garantía de entrega adicional; suficiente pa
 
 ## 6. Estructura del Repositorio
 
-├── backend/ # Backend Django (airsrv): ingesta MQTT, InfluxDB y API REST
-│ ├── airsrv/ # Configuración del proyecto Django (settings, urls)
-│ │ └── .env.example # Plantilla de configuración MQTT/InfluxDB
-│ ├── telemetry/ # App: cliente MQTT, endpoints REST, lógica de ventilación
-│ ├── manage.py
-│ └── requirements.txt
-├── docs/ # Informe técnico formal en PDF
-├── firmware/ # Código fuente para el microcontrolador ESP32
-│ └── calidad_aire_esp32/
-│ ├── calidad_aire_esp32.ino # Firmware Arduino/ESP32
-│ └── config.h.example # Plantilla de credenciales WiFi y Broker
-├── frontend/ # Aplicación web Django para visualización (airdash)
-│ ├── airdash/ # Configuración del proyecto Django web
-│ │ └── .env.example # Plantilla de configuración (URL del backend)
-│ ├── dashboard/ # App frontend (vistas, templates y estáticos JS/CSS)
-│ ├── manage.py
-│ └── requirements.txt
+```
+├── backend/                       # Backend Django (airsrv): ingesta MQTT, InfluxDB y API REST
+│   ├── airsrv/                    # Configuración del proyecto Django (settings, urls)
+│   │   └── .env.example           # Plantilla de configuración MQTT/InfluxDB
+│   ├── telemetry/                 # App: cliente MQTT, endpoints REST, lógica de ventilación
+│   ├── manage.py
+│   └── requirements.txt
+├── docs/                          # Informe técnico formal en PDF
+├── firmware/                      # Código fuente para el microcontrolador ESP32
+│   └── calidad_aire_esp32/
+│       ├── calidad_aire_esp32.ino # Firmware Arduino/ESP32
+│       └── config.h.example       # Plantilla de credenciales WiFi y Broker
+├── frontend/                      # Aplicación web Django para visualización (airdash)
+│   ├── airdash/                   # Configuración del proyecto Django web
+│   │   └── .env.example           # Plantilla de configuración (URL del backend)
+│   ├── dashboard/                 # App frontend (vistas, templates y estáticos JS/CSS)
+│   ├── manage.py
+│   └── requirements.txt
 ├── mosquitto/
-│ └── config/
-│ └── mosquitto.conf # Configuración del broker para el contenedor Docker
-├── simulator/ # Simulador de hardware para pruebas sin ESP32 físico
-│ ├── simulator.py # Emulador MQTT del ESP32 y del sensor MQ-135
-│ └── requirements.txt
-├── docker-compose.yml # Levanta Mosquitto e InfluxDB con versiones fijas
+│   └── config/
+│       └── mosquitto.conf         # Configuración del broker para el contenedor Docker
+├── simulator/                     # Simulador de hardware para pruebas sin ESP32 físico
+│   ├── simulator.py               # Emulador MQTT del ESP32 y del sensor MQ-135
+│   └── requirements.txt
+├── docker-compose.yml             # Levanta Mosquitto e InfluxDB con versiones fijas
 ├── .gitignore
 └── README.md
-
+```
 
 ## 7. Puesta en Marcha
+
+*No hace falta hardware físico para probar el sistema.* Los pasos 7.1 a 7.4 levantan todo el stack (broker, base de datos, backend, frontend y un simulador de sensor) en una sola máquina, sin necesidad de una Raspberry Pi, un ESP32 ni un sensor real. El paso 7.5 (firmware físico) es opcional, solo para quien tenga el hardware armado.
 
 ### 7.1 Infraestructura (Mosquitto + InfluxDB)
 
@@ -152,13 +155,9 @@ Mientras corre, se puede escribir un número (0-4095) + Enter en la consola para
 
 ## 8. Placeholders de Credenciales
 
-Ningún archivo con credenciales reales (`.env`, `config.h`) se sube al repositorio — están excluidos vía `.gitignore`. En su lugar, cada componente incluye una plantilla:
+Ningún archivo con credenciales reales (`.env`, `config.h`) se sube al repositorio — están excluidos vía `.gitignore`. En su lugar, cada componente incluye una plantilla.
 
-| Componente | Plantilla | Archivo real a crear |
-|---|---|---|
-| Backend | `backend/airsrv/.env.example` | `backend/airsrv/.env` |
-| Frontend | `frontend/airdash/.env.example` | `frontend/airdash/.env` |
-| Firmware | `firmware/calidad_aire_esp32/config.h.example` | `firmware/calidad_aire_esp32/config.h` |
+Para el **backend**, la plantilla es `backend/airsrv/.env.example`, a partir de la cual debe crearse el archivo real `backend/airsrv/.env`. Para el **frontend**, la plantilla es `frontend/airdash/.env.example`, a partir de la cual debe crearse `frontend/airdash/.env`. Para el **firmware**, la plantilla es `firmware/calidad_aire_esp32/config.h.example`, a partir de la cual debe crearse `firmware/calidad_aire_esp32/config.h`.
 
 ## 9. Limitaciones Conocidas
 
