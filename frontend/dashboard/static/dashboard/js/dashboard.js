@@ -4,10 +4,13 @@ const REFRESH_INTERVAL = 4000; // 4s
 const WARNING_THRESHOLD = 700;    // ajustá si querés
 const DANGER_THRESHOLD  = 1500;   // ajustá si querés
 
+javascript
 let autoRefresh = true;
 let refreshTimer = null;
 let mainChart = null;
 let hourlyChart = null;
+let lastKnownStatus = null;
+let lastKnownFan = { fan_on: null, manual_mode: null };
 
 const chartColors = { text:'#e0e0e0', grid:'#404040', primary:'#4CAF50' };
 
@@ -59,7 +62,9 @@ async function fetchLatest() {
     if (d.gas != null) updateCurrentValue(d.gas);
     if (d.status) {
       const pretty = d.status.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
-      document.getElementById('currentStatus').textContent = `Estado: ${pretty}`;
+      document.getElementById('currentStatus').textContent = 'Estado: ${pretty}';
+      lastKnownStatus = d.status;
+      updateSafetyAlert();
     }
     if (d.ts) {
       const t = new Date(d.ts/1e6);
@@ -154,6 +159,16 @@ function updateFanPanel(d) {
   else if (manual === false) parts.push('Modo automático');
   if (d.simulated) parts.push('simulado (sin conexión con el relé físico)');
   note.textContent = parts.length ? parts.join(' — ') : '\u00A0';
+
+  lastKnownFan = { fan_on: d.fan_on, manual_mode: d.manual_mode };
+  updateSafetyAlert();
+}
+
+function updateSafetyAlert() {
+  const alertBox = document.getElementById('fanSafetyAlert');
+  const isDanger = lastKnownStatus === 'aire_peligroso';
+  const isManualOff = lastKnownFan.manual_mode === true && lastKnownFan.fan_on === false;
+  alertBox.style.display = (isDanger && isManualOff) ? 'block' : 'none';
 }
 
 // === UI helpers ===
@@ -170,7 +185,6 @@ function updateStatistics(stats) {
   document.getElementById('avgValue').textContent = Math.round(stats.average ?? 0);
   document.getElementById('maxValue').textContent = Math.round(stats.maximum ?? 0);
   document.getElementById('minValue').textContent = Math.round(stats.minimum ?? 0);
-  document.getElementById('countValue').textContent = stats.total_readings ?? '--';
 }
 
 function updateMainChart(data) {
@@ -207,7 +221,7 @@ function toggleAutoRefresh() {
 
 function startAuto() {
   stopAuto();
-  refreshTimer = setInterval(() => { if (autoRefresh) fetchLatest(); }, REFRESH_INTERVAL);
+  refreshTimer = setInterval(() => { if (autoRefresh) refreshData(); }, REFRESH_INTERVAL);
 }
 function stopAuto() { if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; } }
 
