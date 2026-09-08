@@ -21,7 +21,6 @@ El sistema tiene como objetivo el monitoreo continuo de la calidad del aire en e
 - **Microcontrolador:** ESP32 (con conectividad WiFi integrada).
 - **Sensor de gas:** MQ-135 (sensible a amoníaco, óxidos de nitrógeno, humo y CO2, conectado a entrada analógica ADC).
 - **Actuador:** Relay conectado a pin GPIO para accionar el ventilador (control manual y automático); LED indicador de calidad del aire (verde/amarillo/rojo).
-- **Carcasa física:** Gabinete diseñado en Onshape e impreso en 3D para la sujeción y protección de la electrónica.
 
 ## 3. Arquitectura del Sistema
 
