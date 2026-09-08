@@ -185,7 +185,6 @@ function updateStatistics(stats) {
   document.getElementById('avgValue').textContent = Math.round(stats.average ?? 0);
   document.getElementById('maxValue').textContent = Math.round(stats.maximum ?? 0);
   document.getElementById('minValue').textContent = Math.round(stats.minimum ?? 0);
-  document.getElementById('countValue').textContent = stats.total_readings ?? '--';
 }
 
 function updateMainChart(data) {
