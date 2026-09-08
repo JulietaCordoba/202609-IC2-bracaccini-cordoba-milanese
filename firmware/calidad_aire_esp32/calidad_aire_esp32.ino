@@ -3,7 +3,7 @@
 #include "config.h"   // WIFI_SSID, WIFI_PASS y MQTT_HOST viven acá (no se sube al repo)
 
 // -------- PINES Y CONFIGURACIÓN --------
-const int MQ135_A0 = 32;   // ADC GPIO32 en ESP32
+const int MQ135_A0 = 32;   
 
 // LEDs
 const int LED_VERDE    = 27;
@@ -11,14 +11,16 @@ const int LED_AMARILLO = 26;
 const int LED_ROJO     = 25;
 
 // Relay
-const int RELAY_PIN = 23;   // pin del relay del ventilador
+const int RELAY_PIN = 23;   
+const int RELAY_ON  = HIGH;  
+const int RELAY_OFF = LOW; 
 
 // MQTT
 const int MQTT_PORT = 1883;
 
 const char* TOPIC_MQ135     = "aq/aula-1/mq135";        // datos del sensor
 const char* TOPIC_VENT_SET  = "aq/aula-1/vent/set";     // recibe ON/OFF/AUTO
-const char* TOPIC_VENT_EST  = "aq/aula-1/vent/estado";  // publica ON/OFF
+const char* TOPIC_VENT_EST  = "aq/aula-1/vent/estado";  // publica estado (JSON)
 
 WiFiClient espClient;
 PubSubClient mqtt(espClient);
@@ -27,14 +29,8 @@ unsigned long lastSend = 0;
 const unsigned long SEND_INTERVAL = 4000; // 4 segundos
 
 // --- Modo de control del ventilador ---
-// Mientras manualMode == true, el bloque automático del loop() no toca el
-// relé: solo lo hace el usuario desde la web (comandos ON/OFF). El sistema
-// vuelve a decidir solo cuando llega el comando "AUTO".
 bool manualMode = false;
 
-// ======================================================
-//  WIFI
-// ======================================================
 void connectWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
@@ -47,9 +43,19 @@ void connectWiFi() {
   Serial.println(WiFi.localIP());
 }
 
-// ======================================================
-//   MQTT CALLBACK
-// ======================================================
+void setFan(bool on) {
+  digitalWrite(RELAY_PIN, on ? RELAY_ON : RELAY_OFF);
+}
+
+void publishVentStatus() {
+  bool fanOn = (digitalRead(RELAY_PIN) == RELAY_ON);
+  char msg[48];
+  snprintf(msg, sizeof(msg), "{\"fan_on\":%s,\"manual\":%s}",
+           fanOn ? "true" : "false",
+           manualMode ? "true" : "false");
+  mqtt.publish(TOPIC_VENT_EST, msg);
+}
+
 void callback(char* topic, byte* payload, unsigned int length) {
   String msg;
   for (unsigned int i = 0; i < length; i++) msg += (char)payload[i];
@@ -58,27 +64,23 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   if (msg == "ON") {
     manualMode = true;
-    digitalWrite(RELAY_PIN, LOW);     // relay activo
-    mqtt.publish(TOPIC_VENT_EST, "ON");
+    setFan(true);
     Serial.println("[ESP32] Ventilador -> ON (manual)");
+    publishVentStatus();
   }
   else if (msg == "OFF") {
     manualMode = true;
-    digitalWrite(RELAY_PIN, HIGH);    // relay apagado
-    mqtt.publish(TOPIC_VENT_EST, "OFF");
+    setFan(false);
     Serial.println("[ESP32] Ventilador -> OFF (manual)");
+    publishVentStatus();
   }
   else if (msg == "AUTO") {
     manualMode = false;
     Serial.println("[ESP32] Ventilador -> modo AUTOMATICO reactivado");
-    // No tocamos el relé acá: el próximo ciclo del loop() lo va a
-    // ajustar según la lectura actual del sensor.
+    publishVentStatus();
   }
 }
 
-// ======================================================
-//  MQTT CONNECT
-// ======================================================
 void connectMQTT() {
   mqtt.setServer(MQTT_HOST, MQTT_PORT);
 
@@ -88,7 +90,7 @@ void connectMQTT() {
     if (mqtt.connect(clientId.c_str())) {
       Serial.println(" conectado!");
 
-      mqtt.subscribe(TOPIC_VENT_SET);  // escuchar órdenes
+      mqtt.subscribe(TOPIC_VENT_SET);  
     } else {
       Serial.print(" fallo rc=");
       Serial.print(mqtt.state());
@@ -98,9 +100,6 @@ void connectMQTT() {
   }
 }
 
-// ======================================================
-//  SETUP
-// ======================================================
 void setup() {
   Serial.begin(115200);
   delay(1000);
@@ -116,12 +115,11 @@ void setup() {
 
   // Relay
   pinMode(RELAY_PIN, OUTPUT);
-  digitalWrite(RELAY_PIN, HIGH);  // apagado al inicio (HIGH = off)
+  setFan(false);  
+
+  publishVentStatus();
 }
 
-// ======================================================
-//  LOOP
-// ======================================================
 void loop() {
   if (WiFi.status() != WL_CONNECTED) connectWiFi();
   if (!mqtt.connected()) connectMQTT();
@@ -131,11 +129,10 @@ void loop() {
   if (now - lastSend > SEND_INTERVAL) {
     lastSend = now;
 
-    int val = analogRead(MQ135_A0);  // lectura cruda
+    int val = analogRead(MQ135_A0);  
     const char* estado;
 
-    // --- Clasificación del aire (esto SIEMPRE se calcula y se muestra
-    // en los LEDs, independientemente del modo del ventilador) ---
+    // --- Clasificación del aire 
     if (val <= 700) {
       digitalWrite(LED_VERDE, HIGH);
       digitalWrite(LED_AMARILLO, LOW);
@@ -156,18 +153,9 @@ void loop() {
     }
 
     // --- CONTROL AUTOMÁTICO DEL VENTILADOR ---
-    // Solo actúa si NO estamos en modo manual. Si el usuario apagó el
-    // ventilador a mano, esto no lo va a volver a prender solo hasta
-    // que llegue el comando "AUTO".
     if (!manualMode) {
-      if (val <= 700) {
-        digitalWrite(RELAY_PIN, HIGH);
-        mqtt.publish(TOPIC_VENT_EST, "OFF");
-      } else {
-        // "ambiente regular" o "ambiente peligroso": ventilador ON
-        digitalWrite(RELAY_PIN, LOW);
-        mqtt.publish(TOPIC_VENT_EST, "ON");
-      }
+      setFan(val > 1500);
+      publishVentStatus();
     }
 
     // --- Publicar datos del sensor ---
