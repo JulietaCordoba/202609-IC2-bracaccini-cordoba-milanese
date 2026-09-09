@@ -10,6 +10,8 @@
 **Institución:** Universidad Nacional de Rafaela (UNRaf)
 **Carrera:** Ingeniería en Computación
 **Materia:** Ingeniería en Computación II (IC2)
+**Comisión:** 1
+**N° de TP:** Trabajo Final (TF)
 **Año / Período:** Septiembre 2026
 
 ## 2. Descripción del Proyecto
@@ -57,37 +59,36 @@ El tópico `aq/aula-1/vent/estado` es publicado por el ESP32 (o por `simulator.p
   - `PubSubClient` (v2.8)
 - **Broker MQTT:** Eclipse Mosquitto 2.0.18 (contenedor Docker, puerto 1883).
 - **Base de Datos:** InfluxDB 1.11 (contenedor Docker, puerto 8086, base: `calidadaire`).
-- **Backend** (`backend/`): Python 3.11, Django 5.2.7, paho-mqtt 2.1.0, influxdb 5.3.2, python-dotenv 1.1.1.
+- **Backend** (`backend/`): Python 3.11, Django 5.2.7, djangorestframework 3.18.1, django-cors-headers 4.9.0, paho-mqtt 2.1.0, influxdb 5.3.2, python-dotenv 1.1.1.
 - **Frontend** (`frontend/`): Python 3.11, Django 5.2.7, requests 2.32.3, python-dotenv 1.0.1, Django Templates, HTML5, CSS3, JavaScript (Fetch API, Chart.js).
 - **Simulador** (`simulator/`): Python 3.11, paho-mqtt 2.1.0.
 
 ## 6. Estructura del Repositorio
-
 ```
-├── backend/                       # Backend Django (airsrv): ingesta MQTT, InfluxDB y API REST
-│   ├── airsrv/                    # Configuración del proyecto Django (settings, urls)
-│   │   └── .env.example           # Plantilla de configuración MQTT/InfluxDB
-│   ├── telemetry/                 # App: cliente MQTT, endpoints REST, lógica de ventilación
-│   ├── manage.py
-│   └── requirements.txt
-├── docs/                          # Informe técnico formal en PDF
-├── firmware/                      # Código fuente para el microcontrolador ESP32
-│   └── calidad_aire_esp32/
-│       ├── calidad_aire_esp32.ino # Firmware Arduino/ESP32
-│       └── config.h.example       # Plantilla de credenciales WiFi y Broker
-├── frontend/                      # Aplicación web Django para visualización (airdash)
-│   ├── airdash/                   # Configuración del proyecto Django web
-│   │   └── .env.example           # Plantilla de configuración (URL del backend)
-│   ├── dashboard/                 # App frontend (vistas, templates y estáticos JS/CSS)
-│   ├── manage.py
-│   └── requirements.txt
+├── backend/ # Backend Django (airsrv): ingesta MQTT, InfluxDB y API REST
+│ ├── airsrv/ # Configuración del proyecto Django (settings, urls)
+│ │ └── .env.example # Plantilla de configuración MQTT/InfluxDB
+│ ├── telemetry/ # App: cliente MQTT, endpoints REST, lógica de ventilación
+│ ├── manage.py
+│ └── requirements.txt
+├── docs/ # Informe técnico formal en PDF
+├── firmware/ # Código fuente para el microcontrolador ESP32
+│ └── calidad_aire_esp32/
+│ ├── calidad_aire_esp32.ino # Firmware Arduino/ESP32
+│ └── config.h.example # Plantilla de credenciales WiFi y Broker
+├── frontend/ # Aplicación web Django para visualización (airdash)
+│ ├── airdash/ # Configuración del proyecto Django web
+│ │ └── .env.example # Plantilla de configuración (URL del backend)
+│ ├── dashboard/ # App frontend (vistas, templates y estáticos JS/CSS)
+│ ├── manage.py
+│ └── requirements.txt
 ├── mosquitto/
-│   └── config/
-│       └── mosquitto.conf         # Configuración del broker para el contenedor Docker
-├── simulator/                     # Simulador de hardware para pruebas sin ESP32 físico
-│   ├── simulator.py               # Emulador MQTT del ESP32 y del sensor MQ-135
-│   └── requirements.txt
-├── docker-compose.yml             # Levanta Mosquitto e InfluxDB con versiones fijas
+│ └── config/
+│ └── mosquitto.conf # Configuración del broker para el contenedor Docker
+├── simulator/ # Simulador de hardware para pruebas sin ESP32 físico
+│ ├── simulator.py # Emulador MQTT del ESP32 y del sensor MQ-135
+│ └── requirements.txt
+├── docker-compose.yml # Levanta Mosquitto e InfluxDB con versiones fijas
 ├── .gitignore
 └── README.md
 ```
@@ -98,11 +99,15 @@ El tópico `aq/aula-1/vent/estado` es publicado por el ESP32 (o por `simulator.p
 
 ### 7.1 Infraestructura (Mosquitto + InfluxDB)
 
+> **Requisito previo:** Docker Desktop tiene que estar *abierto y corriendo* (no alcanza con tenerlo instalado). Si el comando siguiente tira un error de conexión al motor de Docker, abrí la aplicación Docker Desktop y esperá a que termine de iniciar antes de reintentar.
+
 Desde la raíz del repositorio:
 ```bash
 docker compose up -d
 ```
 Esto levanta Mosquitto (puerto 1883) e InfluxDB (puerto 8086) con las versiones fijadas en `docker-compose.yml`, ya configurados para aceptar conexiones desde la red local. La base de datos `calidadaire` se crea automáticamente al iniciar el contenedor.
+
+> **Nota:** la primera vez que se ejecuta este comando, Docker tiene que descargar las imágenes de Mosquitto e InfluxDB (unos 120 MB en total), lo que puede tardar varios minutos según la conexión a internet. Las siguientes veces será casi instantáneo, ya que las imágenes quedan en caché local.
 
 Verificar que ambos estén corriendo:
 ```bash
