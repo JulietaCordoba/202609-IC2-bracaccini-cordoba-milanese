@@ -136,9 +136,11 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cp airdash/.env.example airdash/.env
 # Editar airdash/.env con la IP real del backend (RASPBERRY_API_BASE)
-python manage.py runserver
+python manage.py runserver 8001
 ```
-Abrir `http://127.0.0.1:8000` en el navegador.
+> Se usa el puerto 8001 (en vez del 8000 por defecto) porque el backend ya ocupa el puerto 8000 en el paso anterior. Si corren backend y frontend en máquinas distintas, pueden usar el puerto 8000 en ambos sin problema.
+
+Abrir `http://127.0.0.1:8001` en el navegador.
 
 ### 7.4 Simulador (sin hardware físico)
 
