@@ -1,5 +1,5 @@
 // === Config ===
-const API_BASE = 'http://192.168.1.62:8000/api';
+const API_BASE = '/api';
 const REFRESH_INTERVAL = 4000; // 4s
 const WARNING_THRESHOLD = 700;    // ajustá si querés
 const DANGER_THRESHOLD  = 1500;   // ajustá si querés
