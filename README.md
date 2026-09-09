@@ -41,6 +41,7 @@ La **capa de presentación** corresponde al frontend Django (`airdash`/`dashboar
 Todos los tópicos usan QoS 0 (sin garantía de entrega adicional; suficiente para telemetría periódica y comandos idempotentes).
 
 El tópico `aq/aula-1/mq135` es publicado por el ESP32 (o por `simulator.py`) y consumido por el backend (`airsrv`). Su payload es un JSON con la estructura `{"g": <int>, "estado": "<string>"}`, donde `g` es el valor analógico crudo del sensor (0-4095) y `estado` es uno de los siguientes valores: `"ambiente limpio"`, `"ambiente regular"` o `"ambiente peligroso"`. Este mensaje se publica cada 4 segundos y corresponde a la telemetría del sensor.
+En caso de que la lectura del sensor esté fuera del rango esperado (posible desconexión física), el ESP32 publica en su lugar `{"fault": true, "raw": <int>, "consecutivas": <int>}`, donde `raw` es el valor crudo fuera de rango y `consecutivas` cuenta cuántas lecturas inválidas seguidas se registraron.
 
 El tópico `aq/aula-1/vent/set` es publicado por el backend (`airsrv`) y consumido por el ESP32 (o por `simulator.py`). Su payload es texto plano, con alguno de los valores `"ON"`, `"OFF"`, `"AUTO"` o `"MANUAL"`, y representa el comando de control del ventilador enviado desde la web. Los comandos `ON`/`OFF` fuerzan el estado del relé y activan el modo manual; `AUTO` devuelve el control al umbral automático del sensor; `MANUAL` cambia a modo manual sin alterar el estado actual del relé.
 
